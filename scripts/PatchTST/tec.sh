@@ -46,6 +46,6 @@ python -u run_longExp.py \
   --train_epochs 100\
   --patience 15\
   --test_year $test_year\
-  --run_type 2\
+  --run_type 0\
   --model_year 0\
   --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${test_year}_${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
