@@ -193,7 +193,7 @@ class Dataset_Custom(Dataset):
     def __init__(self, root_path, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
                  target='OT', scale=True, timeenc=0, freq='h',
-                 test_year=None, batch_size=128):
+                 test_year=0, batch_size=128,calculate_MSE=0):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -220,6 +220,7 @@ class Dataset_Custom(Dataset):
 
         self.root_path = root_path
         self.data_path = data_path
+        self.calculate_MSE = calculate_MSE
         self.__read_data__()
 
     def __read_data__(self):
@@ -238,13 +239,17 @@ class Dataset_Custom(Dataset):
 
         idx1 = idx2 = idx3 = 0
         
-        if self.test_year == None:
+        if self.test_year == 0:
             num_train = int(len(df_raw) * 0.7)
             num_test = int(len(df_raw) * 0.2)
             num_vali = len(df_raw) - num_train - num_test
             idx1 = num_train
             idx2 = num_train + num_vali
             idx3 = len(df_raw)
+            print(f"   数据总长度: {len(df_raw)}")
+            print(f"   num_train: {num_train}")
+            print(f"   num_test: {num_test}")
+            print(f"   num_vali: {num_vali}")
             
         else:
             df_raw['date'] = pd.to_datetime(df_raw['date'])
@@ -299,7 +304,7 @@ class Dataset_Custom(Dataset):
         self.test_dates = df_raw['date'].values[border1:border2] # 保存测试样例的日期
 
     def __getitem__(self, index):
-        if self.set_type == 2:
+        if self.calculate_MSE:
             s_begin = index * self.pred_len
             s_end = s_begin + self.seq_len
             r_begin = s_end - self.label_len
@@ -332,13 +337,13 @@ class Dataset_Custom(Dataset):
             return seq_x, seq_y, seq_x_mark, seq_y_mark
 
     def __len__(self):
-        if self.set_type == 2:
+        if self.calculate_MSE:
             return math.ceil((len(self.data_x) - self.seq_len)/self.pred_len)
         else:
             return len(self.data_x) - self.seq_len - self.pred_len + 1
 
     def get_batch_dates(self, batch_idx):
-        if self.set_type != 2:
+        if self.calculate_MSE == 0:
             return []
         else:
             dates = []
@@ -353,8 +358,8 @@ class Dataset_Custom(Dataset):
                     
                 pred_dates = self.test_dates[pred_s:pred_e]
                 dates.append(pred_dates)
-            return dates       
-        
+            return dates    
+            
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
     

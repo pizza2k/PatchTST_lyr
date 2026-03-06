@@ -13,6 +13,8 @@ if __name__ == '__main__':
 
     # basic config
     parser.add_argument('--is_training', type=int, required=True, default=1, help='status')
+    # 0:test 1:train 2:train&test
+    parser.add_argument('--run_type', type=int, required=True, default=1, help='status')
     parser.add_argument('--model_id', type=str, required=True, default='test', help='model id')
     parser.add_argument('--model', type=str, required=True, default='Autoformer',
                         help='model name, options: [Autoformer, Informer, Transformer]')
@@ -28,6 +30,7 @@ if __name__ == '__main__':
                         help='freq for time features encoding, options:[s:secondly, t:minutely, h:hourly, d:daily, b:business days, w:weekly, m:monthly], you can also use more detailed freq like 15min or 3h')
     parser.add_argument('--checkpoints', type=str, default='./checkpoints/', help='location of model checkpoints')
     parser.add_argument('--test_year', type=int, default=None, help='specific year for testing (e.g., 2018). If None, use proportion split')
+    parser.add_argument('--model_year', type=int, default=None, help='test_year of model')
 
     # forecasting task
     parser.add_argument('--seq_len', type=int, default=96, help='input sequence length')
@@ -116,11 +119,43 @@ if __name__ == '__main__':
 
     Exp = Exp_Main
 
-    if args.is_training:
+    args.test_year = args.test_year if args.test_year is not None else 0
+    
+    if args.run_type == 1:
+        print("we will train")
+        for ii in range(args.itr):
+            # setting record of experiments
+            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+                args.test_year,
+                args.model_id,
+                args.model,
+                args.data,
+                args.features,
+                args.seq_len,
+                args.label_len,
+                args.pred_len,
+                args.d_model,
+                args.n_heads,
+                args.e_layers,
+                args.d_layers,
+                args.d_ff,
+                args.factor,
+                args.embed,
+                args.distil,
+                args.des,ii)
+
+            exp = Exp(args)  # set experiments
+            print('>>>>>>>start training : {}>>>>>>>>>>>>>>>>>>>>>>>>>>'.format(setting))
+            exp.train(setting)
+
+            torch.cuda.empty_cache()
+            
+    elif args.run_type == 2:
         print("we will train and test")
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+                args.test_year,
                 args.model_id,
                 args.model,
                 args.data,
@@ -143,7 +178,7 @@ if __name__ == '__main__':
             exp.train(setting)
 
             print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-            exp.test(setting)
+            exp.test(setting, setting)
 
             if args.do_predict:
                 print('>>>>>>>predicting : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
@@ -152,7 +187,8 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
     else:
         ii = 0
-        setting = '{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model_id,
+        setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.test_year,
+                                                                                                    args.model_id,
                                                                                                     args.model,
                                                                                                     args.data,
                                                                                                     args.features,
@@ -168,9 +204,32 @@ if __name__ == '__main__':
                                                                                                     args.embed,
                                                                                                     args.distil,
                                                                                                     args.des, ii)
+        model_setting = setting 
+        model_year = args.test_year
+        if args.model_year is not None:
+            model_year = args.model_year
+            model_setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model_year,
+                                                                                                        args.model_id,
+                                                                                                        args.model,
+                                                                                                        args.data,
+                                                                                                        args.features,
+                                                                                                        args.seq_len,
+                                                                                                        args.label_len,
+                                                                                                        args.pred_len,
+                                                                                                        args.d_model,
+                                                                                                        args.n_heads,
+                                                                                                        args.e_layers,
+                                                                                                        args.d_layers,
+                                                                                                        args.d_ff,
+                                                                                                        args.factor,
+                                                                                                        args.embed,
+                                                                                                        args.distil,
+                                                                                                        args.des, ii) 
+        
 
+        args.model_year = model_year
         exp = Exp(args)  # set experiments
         print('>>>>>>>testing : {}<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<'.format(setting))
-        exp.test(setting, test=1)
+        exp.test(setting, model_setting, test=1)
         torch.cuda.empty_cache()
         

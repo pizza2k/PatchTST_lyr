@@ -10,7 +10,7 @@ data_dict = {
 }
 
 
-def data_provider(args, flag):
+def data_provider(args, flag, calculate_MSE):
     Data = data_dict[args.data]
     timeenc = 0 if args.embed != 'timeF' else 1
 
@@ -41,7 +41,8 @@ def data_provider(args, flag):
         timeenc=timeenc,
         freq=freq,
         batch_size=batch_size,
-        test_year=args.test_year
+        test_year=args.test_year,
+        calculate_MSE=calculate_MSE
     )
     print(flag, len(data_set))
     data_loader = DataLoader(

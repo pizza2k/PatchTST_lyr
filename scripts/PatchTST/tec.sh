@@ -17,6 +17,8 @@ data_name=custom
 
 random_seed=2021
 
+test_year=0
+
 python -u run_longExp.py \
   --random_seed $random_seed \
   --is_training 1 \
@@ -43,5 +45,7 @@ python -u run_longExp.py \
   --target '(0.0, 20)' \
   --train_epochs 100\
   --patience 15\
-  --test_year 2014\
-  --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
+  --test_year $test_year\
+  --run_type 2\
+  --model_year 0\
+  --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${test_year}_${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"

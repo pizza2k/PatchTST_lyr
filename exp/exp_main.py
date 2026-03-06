@@ -41,8 +41,8 @@ class Exp_Main(Exp_Basic):
             model = nn.DataParallel(model, device_ids=self.args.device_ids)
         return model
 
-    def _get_data(self, flag):
-        data_set, data_loader = data_provider(self.args, flag)
+    def _get_data(self, flag, calculate_MSE):
+        data_set, data_loader = data_provider(self.args, flag, calculate_MSE)
         return data_set, data_loader
 
     def _select_optimizer(self):
@@ -100,9 +100,9 @@ class Exp_Main(Exp_Basic):
         return total_loss
 
     def train(self, setting):
-        train_data, train_loader = self._get_data(flag='train')
-        vali_data, vali_loader = self._get_data(flag='val')
-        test_data, test_loader = self._get_data(flag='test')
+        train_data, train_loader = self._get_data(flag='train', calculate_MSE=0)
+        vali_data, vali_loader = self._get_data(flag='val', calculate_MSE=0)
+        test_data, test_loader = self._get_data(flag='test', calculate_MSE=0)
 
         path = os.path.join(self.args.checkpoints, setting)
         if not os.path.exists(path):
@@ -218,8 +218,8 @@ class Exp_Main(Exp_Basic):
 
         return self.model
 
-    def test(self, setting, test=0):
-        test_data, test_loader = self._get_data(flag='test')
+    def test(self, setting, model_setting, test=0):
+        test_data, test_loader = self._get_data(flag='test', calculate_MSE=1)
 
         print(f"1. 测试加载器信息:")
         print(f"   长度: {len(test_loader)}")
@@ -227,7 +227,7 @@ class Exp_Main(Exp_Basic):
         
         if test:
             print('loading model')
-            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + setting, 'checkpoint.pth')))
+            self.model.load_state_dict(torch.load(os.path.join('./checkpoints/' + model_setting, 'checkpoint.pth')))
 
         preds = []
         trues = []
@@ -235,8 +235,9 @@ class Exp_Main(Exp_Basic):
         dates = []
         daily_mse = {}  # 按天存储MSE
         test_year = self.args.test_year
+        model_year = self.args.model_year if test else test_year
         
-        folder_path = './test_results/' + setting + '/'
+        folder_path = './test_results/' + str(model_year) + '_' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -279,29 +280,32 @@ class Exp_Main(Exp_Basic):
                 outputs = outputs.detach().cpu().numpy()
                 batch_y = batch_y.detach().cpu().numpy()
 
-                # 按天计算MSE
-                batch_dates = test_data.get_batch_dates(i)
-
-                for j in range(len(batch_dates)):
-                    if len(batch_dates[j]) == 0:
-                        continue
-                        
-                    sample_dates = batch_dates[j]
-                    sample_pred = outputs[j]
-                    sample_true = batch_y[j]
+                if test:
                     
-                    for k in range(len(sample_dates)):
-                        current_date = pandas.Timestamp(sample_dates[k])
-                        
-                        if k >= len(sample_pred) or k >= len(sample_true):
+                    # 按天计算MSE
+                    batch_dates = test_data.get_batch_dates(i)
+    
+                    for j in range(len(batch_dates)):
+                        if len(batch_dates[j]) == 0:
                             continue
                             
-                        mse = (sample_pred[k] - sample_true[k]) ** 2
-                        date_str = current_date.strftime('%Y-%m-%d')
+                        sample_dates = batch_dates[j]
+                        sample_pred = outputs[j]
+                        sample_true = batch_y[j]
                         
-                        if date_str not in daily_mse:
-                            daily_mse[date_str] = []
-                        daily_mse[date_str].append(mse)
+                        for k in range(len(sample_dates)):
+                            current_date = pandas.Timestamp(sample_dates[k])
+                            
+                            if k >= len(sample_pred) or k >= len(sample_true):
+                                continue
+                                
+                            mse = (sample_pred[k] - sample_true[k]) ** 2
+                            date_str = current_date.strftime('%Y-%m-%d')
+                            
+                            if date_str not in daily_mse:
+                                daily_mse[date_str] = []
+                            daily_mse[date_str].append(mse)
+                    dates.append(batch_dates) # 添加日期
                 
                             
                 pred = outputs  # outputs.detach().cpu().numpy()  # .squeeze()
@@ -310,7 +314,7 @@ class Exp_Main(Exp_Basic):
                 preds.append(pred)
                 trues.append(true)
                 inputx.append(batch_x.detach().cpu().numpy())
-                dates.append(batch_dates) # 添加日期
+                
                 
                 if i % 20 == 0:
                     input = batch_x.detach().cpu().numpy()
@@ -324,46 +328,25 @@ class Exp_Main(Exp_Basic):
         preds = np.array(preds)
         trues = np.array(trues)
         inputx = np.array(inputx)
-
-        print(f"  preds形状: {preds.shape}")
-        print(f"  preds维度: {preds.ndim}")
-        print(f"  trues形状: {trues.shape}")
-        print(f"  inputx形状: {inputx.shape}")
         
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         inputx = inputx.reshape(-1, inputx.shape[-2], inputx.shape[-1])
+        
+        if test:
+            # 计算每天的平均MSE
+            daily_avg_mse = {}
+            for date_str, mse_list in daily_mse.items():
+                daily_avg_mse[date_str] = np.mean(mse_list)
+        
+            # 保存MSE为CSV
+            mse_df = pandas.DataFrame(list(daily_avg_mse.items()), columns=['Date', 'MSE'])
+            mse_df = mse_df.sort_values('Date')
+                
+            csv_path = os.path.join(folder_path, f'daily_mse_{test_year}.csv')
+            mse_df.to_csv(csv_path, index=False)
+            print(f"Daily MSE saved to: {csv_path}")
 
-        # 计算每天的平均MSE
-        daily_avg_mse = {}
-        for date_str, mse_list in daily_mse.items():
-            daily_avg_mse[date_str] = np.mean(mse_list)
-    
-        # 保存MSE为CSV
-        mse_df = pandas.DataFrame(list(daily_avg_mse.items()), columns=['Date', 'MSE'])
-        mse_df = mse_df.sort_values('Date')
-            
-        csv_path = os.path.join(folder_path, f'daily_mse_{test_year}.csv')
-        mse_df.to_csv(csv_path, index=False)
-        print(f"Daily MSE saved to: {csv_path}")
-
-        # # 绘制折线图
-        # plt.figure(figsize=(15, 6))
-        # plt.plot(mse_df['Date'], mse_df['MSE'], marker='o', linewidth=2, markersize=4)
-        # plt.title('Daily MSE for 2018 Predictions')
-        # plt.xlabel('Date')
-        # plt.ylabel('MSE')
-        # plt.xticks(rotation=45)
-        # plt.grid(True, alpha=0.3)
-        # plt.tight_layout()
-    
-        # # 保存图片
-        # plot_path = os.path.join(folder_path, f'daily_mse_{test_year}.png')
-        # plt.savefig(plot_path, dpi=300, bbox_inches='tight')
-        # print(f"MSE plot saved to: {plot_path}")
-        # plt.show()
-
-        plot_daily_mse(csv_path, test_year, folder_path)
 
         # 计算原本的所有指标
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
