@@ -232,8 +232,7 @@ class Exp_Main(Exp_Basic):
         preds = []
         trues = []
         inputx = []
-        dates = []
-        daily_mse = {}  # 按天存储MSE
+        all_sample_info = []  # 存储每个样本的信息
         test_year = self.args.test_year
         model_year = self.args.model_year if test else test_year
         
@@ -279,33 +278,25 @@ class Exp_Main(Exp_Basic):
                 batch_y = batch_y[:, -self.args.pred_len:, f_dim:].to(self.device)
                 outputs = outputs.detach().cpu().numpy()
                 batch_y = batch_y.detach().cpu().numpy()
-
-                    
-                # 按天计算MSE
-                batch_dates = test_data.get_batch_dates(i)
-
-                for j in range(len(batch_dates)):
-                    if len(batch_dates[j]) == 0:
-                        continue
-                        
-                    sample_dates = batch_dates[j]
-                    sample_pred = outputs[j]
-                    sample_true = batch_y[j]
-                    
-                    for k in range(len(sample_dates)):
-                        current_date = pandas.Timestamp(sample_dates[k])
-                        
-                        if k >= len(sample_pred) or k >= len(sample_true):
-                            continue
-                            
-                        mse = (sample_pred[k] - sample_true[k]) ** 2
-                        date_str = current_date.strftime('%Y-%m-%d')
-                        
-                        if date_str not in daily_mse:
-                            daily_mse[date_str] = []
-                        daily_mse[date_str].append(mse)
-                dates.append(batch_dates) # 添加日期
-                
+                batch_mse = (outputs - batch_y) ** 2
+                # 存储每个样本的详细信息
+                for sample_idx in range(batch_mse.shape[0]):
+                    sample_mse = batch_mse[sample_idx]  # [pred_len]
+                    sample_info = {
+                        'batch_id': i,
+                        'sample_id_in_batch': sample_idx,
+                        'global_sample_id': i * batch_mse.shape[0] + sample_idx,
+                        'mse_per_step': sample_mse.tolist(),
+                        'mse_mean': np.mean(sample_mse),
+                        'mse_p90': np.percentile(sample_mse, 90),
+                        'mse_max': np.max(sample_mse),
+                        'mse_min': np.min(sample_mse),
+                        'mse_std': np.std(sample_mse),
+                        # 'mse_median': np.median(sample_mse),
+                        # 'mse_p95': np.percentile(sample_mse, 95),
+                        # 'mse_p99': np.percentile(sample_mse, 99)
+                    }
+                    all_sample_info.append(sample_info)
                             
                 pred = outputs  # outputs.detach().cpu().numpy()  # .squeeze()
                 true = batch_y  # batch_y.detach().cpu().numpy()  # .squeeze()
@@ -324,6 +315,8 @@ class Exp_Main(Exp_Basic):
         if self.args.test_flop:
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
+
+        self.identify_tail_sample(all_sample_info, test_data, test_loader)
         preds = np.array(preds)
         trues = np.array(trues)
         inputx = np.array(inputx)
@@ -331,21 +324,6 @@ class Exp_Main(Exp_Basic):
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
         inputx = inputx.reshape(-1, inputx.shape[-2], inputx.shape[-1])
-        
-        # 计算每天的平均MSE
-        daily_avg_mse = {}
-        for date_str, mse_list in daily_mse.items():
-            daily_avg_mse[date_str] = np.mean(mse_list)
-    
-        # 保存MSE为CSV
-        mse_df = pandas.DataFrame(list(daily_avg_mse.items()), columns=['Date', 'MSE'])
-        mse_df = mse_df.sort_values('Date')
-            
-        csv_path = os.path.join(folder_path, f'daily_mse_{test_year}.csv')
-        mse_df.to_csv(csv_path, index=False)
-        print(f"Daily MSE saved to: {csv_path}")
-        plot_daily_mse(csv_path, test_year, folder_path)
-
 
         # 计算原本的所有指标
         mae, mse, rmse, mape, mspe, rse, corr = metric(preds, trues)
@@ -416,3 +394,55 @@ class Exp_Main(Exp_Basic):
         np.save(folder_path + 'real_prediction.npy', preds)
 
         return
+
+    def identify_tail_sample(all_sample_info, test_data, test_loader):
+        print("开始识别长尾样本...")
+    
+        # 计算每个样本的综合得分
+        for sample_info in all_sample_info:
+        # 收集所有样本的指标
+        all_metrics = {
+            'mse_mean': [info['mse_mean'] for info in all_sample_info],
+            'mse_p90': [info['mse_p90'] for info in all_sample_info],
+            'mse_max': [info['mse_max'] for info in all_sample_info],
+            'mse_std': [info['mse_std'] for info in all_sample_info]
+        }
+        
+        # 计算综合得分
+        weights = {
+            'mse_mean': 0.3,
+            'mse_p90': 0.3,
+            'mse_max': 0.2,
+            'mse_std': 0.2
+        }
+        
+        scores = []
+        for idx, info in enumerate(all_sample_info):
+            score = 0
+            for metric_name, weight in weights.items():
+                # 使用Min-Max归一化（值越大表示误差越大，越可能是长尾样本）
+                metric_values = all_metrics[metric_name]
+                min_val = np.min(metric_values)
+                max_val = np.max(metric_values)
+                if max_val > min_val:
+                    normalized = (info[metric_name] - min_val) / (max_val - min_val)
+                else:
+                    normalized = 0
+                score += weight * normalized
+            scores.append(score)
+            info['composite_score'] = score
+        
+        # 找出得分最高的20%作为长尾样本
+        threshold = np.percentile(scores, 80)  # 前20%的阈值
+        long_tail_indices = [idx for idx, score in enumerate(scores) if score >= threshold]
+        # long_tail_global_ids = set([all_sample_info[idx]['global_sample_id'] 
+        #                         for idx in long_tail_indices])
+        
+        print(f"总样本数: {len(all_sample_info)}")
+        print(f"长尾样本数: {len(long_tail_indices)} ({len(long_tail_indices)/len(all_sample_info)*100:.1f}%)")
+        print(f"得分阈值: {threshold:.4f}")
+        print(f"得分范围: [{np.min(scores):.4f}, {np.max(scores):.4f}]")
+        
+        test_loader.output_tail_by_id(long_tail_indices)
+        
+        print("已生成长尾样本")

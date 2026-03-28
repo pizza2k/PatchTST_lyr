@@ -209,8 +209,8 @@ class Dataset_Custom(Dataset):
         # init
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
-        self.set_type = type_map[flag]
-
+        self.set_type = type_map[flag]   
+            
         self.features = features
         self.target = target
         self.scale = scale
@@ -221,17 +221,25 @@ class Dataset_Custom(Dataset):
         self.root_path = root_path
         self.data_path = data_path
         self.calculate_MSE = calculate_MSE
+        self.df_raw_original = None
+        self.df_raw_cols = None
+        
         self.__read_data__()
 
     def __read_data__(self):
         self.scaler = StandardScaler()
         df_raw = pd.read_csv(os.path.join(self.root_path,
                                           self.data_path))
-
+        
         '''
         df_raw.columns: ['date', ...(other features), target feature]
         '''
         cols = list(df_raw.columns)
+        
+        if self.set_type == 2:
+            self.df_raw_original = df_raw
+            self.df_raw_cols = df_raw.columns.tolist()
+            
         cols.remove(self.target)
         cols.remove('date')
         df_raw = df_raw[['date'] + cols + [self.target]]
@@ -362,7 +370,41 @@ class Dataset_Custom(Dataset):
             
     def inverse_transform(self, data):
         return self.scaler.inverse_transform(data)
-    
+
+    def get_df_raw(self, index):
+        begin = index * self.pred_len
+        end = begin + self.seq_len + self.pred_len
+        
+        if end > len(self.df_raw_original):
+            end = len(self.df_raw_original)
+            begin = end - (self.seq_len + self.pred_len)
+        
+        return self.df_raw_original.iloc[begin:end].copy()
+        
+    def output_tail_by_id(self, item_id_array, folder_path = "tail_sample"):
+        if not hasattr(self, 'df_raw_original'):
+            print("错误：原始数据未加载")
+            return None
+            
+        if not os.path.exists(folder_path):
+            os.makedirs(folder_path)
+            
+        samples_list = []
+        for sample_id in item_id_array:
+            sample_df = self.get_df_raw(sample_id)
+            if sample_df is not None and not sample_df.empty:
+                samples_list.append(sample_df.copy())
+     
+        if samples_list:
+            tail_samples = pd.concat(samples_list, ignore_index=True)
+            output_path = os.path.join(folder_path, f"tail_samples_{self.test_year}.csv")
+            tail_samples.to_csv(output_path, index=False)
+            print(f"已保存 {len(item_id_array)} 个长尾样本到 {output_path}")
+            return tail_samples
+            
+        else:
+            print("没有找到长尾样本")
+            return None
 
 class Dataset_Pred(Dataset):
     def __init__(self, root_path, flag='pred', size=None,
