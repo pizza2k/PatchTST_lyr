@@ -5,7 +5,6 @@ from utils.tools import EarlyStopping, adjust_learning_rate, visual, test_params
 from utils.metrics import metric
 from utils.plot import plot_daily_mse
 
-import numpy as np
 import torch
 import torch.nn as nn
 from torch import optim
@@ -100,6 +99,9 @@ class Exp_Main(Exp_Basic):
         return total_loss
 
     def train(self, setting):
+        if self.args.use_fake:
+            print(f"Using fake data for trainin")
+            
         train_data, train_loader = self._get_data(flag='train', calculate_MSE=0)
         vali_data, vali_loader = self._get_data(flag='val', calculate_MSE=0)
         test_data, test_loader = self._get_data(flag='test', calculate_MSE=0)
@@ -236,7 +238,7 @@ class Exp_Main(Exp_Basic):
         test_year = self.args.test_year
         model_year = self.args.model_year if test else test_year
         
-        folder_path = './test_results/' + str(model_year) + '_' + setting + '/'
+        folder_path = './test_results2/' + str(model_year) + '_' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -292,9 +294,6 @@ class Exp_Main(Exp_Basic):
                         'mse_max': np.max(sample_mse),
                         'mse_min': np.min(sample_mse),
                         'mse_std': np.std(sample_mse),
-                        # 'mse_median': np.median(sample_mse),
-                        # 'mse_p95': np.percentile(sample_mse, 95),
-                        # 'mse_p99': np.percentile(sample_mse, 99)
                     }
                     all_sample_info.append(sample_info)
                             
@@ -316,10 +315,11 @@ class Exp_Main(Exp_Basic):
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
 
-        self.identify_tail_sample(all_sample_info, test_data, test_loader)
-        preds = np.array(preds)
-        trues = np.array(trues)
-        inputx = np.array(inputx)
+        # self.identify_tail_sample(all_sample_info, test_data, test_loader)
+        
+        preds = np.concatenate(preds, axis=0)
+        trues = np.concatenate(trues, axis=0)
+        inputx = np.concatenate(inputx, axis=0)
         
         preds = preds.reshape(-1, preds.shape[-2], preds.shape[-1])
         trues = trues.reshape(-1, trues.shape[-2], trues.shape[-1])
@@ -334,8 +334,17 @@ class Exp_Main(Exp_Basic):
         f.write('\n')
         f.write('\n')
         f.close()
-
-        # np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
+        
+        if isinstance(corr, np.ndarray):
+            corr = corr.mean()
+            
+        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
+        metrics_df = pandas.DataFrame({
+            'Metric': ['MAE', 'MSE', 'RMSE', 'MAPE', 'MSPE', 'RSE', 'CORR'],
+            'Value': [mae, mse, rmse, mape, mspe, rse, corr]
+        })
+        metrics_df.to_csv(folder_path + 'metrics.csv', index=False)
+        
         np.save(folder_path + 'pred.npy', preds)
         # np.save(folder_path + 'true.npy', trues)
         # np.save(folder_path + 'x.npy', inputx)
@@ -395,12 +404,10 @@ class Exp_Main(Exp_Basic):
 
         return
 
-    def identify_tail_sample(all_sample_info, test_data, test_loader):
+    def identify_tail_sample(self, all_sample_info, test_data, test_loader):
         print("开始识别长尾样本...")
-    
-        # 计算每个样本的综合得分
-        for sample_info in all_sample_info:
-        # 收集所有样本的指标
+        
+        # 收集所有样本的指标（移到循环外）
         all_metrics = {
             'mse_mean': [info['mse_mean'] for info in all_sample_info],
             'mse_p90': [info['mse_p90'] for info in all_sample_info],
@@ -435,14 +442,12 @@ class Exp_Main(Exp_Basic):
         # 找出得分最高的20%作为长尾样本
         threshold = np.percentile(scores, 80)  # 前20%的阈值
         long_tail_indices = [idx for idx, score in enumerate(scores) if score >= threshold]
-        # long_tail_global_ids = set([all_sample_info[idx]['global_sample_id'] 
-        #                         for idx in long_tail_indices])
         
         print(f"总样本数: {len(all_sample_info)}")
         print(f"长尾样本数: {len(long_tail_indices)} ({len(long_tail_indices)/len(all_sample_info)*100:.1f}%)")
         print(f"得分阈值: {threshold:.4f}")
         print(f"得分范围: [{np.min(scores):.4f}, {np.max(scores):.4f}]")
         
-        test_loader.output_tail_by_id(long_tail_indices)
+        test_data.output_tail_by_id(long_tail_indices)
         
         print("已生成长尾样本")

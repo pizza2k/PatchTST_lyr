@@ -96,6 +96,12 @@ if __name__ == '__main__':
     parser.add_argument('--devices', type=str, default='0,1,2,3', help='device ids of multile gpus')
     parser.add_argument('--test_flop', action='store_true', default=False, help='See utils/tools for usage')
 
+    # fake data config
+    parser.add_argument('--use_fake', type=int, default=0, help='use fake data for training, 1: use, 0: not use')
+    parser.add_argument('--fake_root_path', type=str, default='./data/fake/', help='root path of the fake data file')
+    parser.add_argument('--fake_data_path', type=str, default='fake_data.csv', help='fake data file')
+    parser.add_argument('--fake_weight', type=float, default=0.2, help='weight of fake data in training (0-1)')
+    
     args = parser.parse_args()
     print("开始解析参数...")
 
@@ -113,10 +119,15 @@ if __name__ == '__main__':
         device_ids = args.devices.split(',')
         args.device_ids = [int(id_) for id_ in device_ids]
         args.gpu = args.device_ids[0]
-
+        
+    if args.use_fake:
+        args.fake = (args.fake_root_path, args.fake_data_path, args.fake_weight)
+    else:
+        args.fake = None
+        
     print('Args in experiment:')
     print(args)
-
+ 
     Exp = Exp_Main
 
     args.test_year = args.test_year if args.test_year is not None else 0
@@ -125,8 +136,9 @@ if __name__ == '__main__':
         print("we will train")
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
                 args.test_year,
+                args.fake_weight,
                 args.model_id,
                 args.model,
                 args.data,
@@ -154,8 +166,9 @@ if __name__ == '__main__':
         print("we will train and test")
         for ii in range(args.itr):
             # setting record of experiments
-            setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
                 args.test_year,
+                args.fake_weight,
                 args.model_id,
                 args.model,
                 args.data,
@@ -187,44 +200,48 @@ if __name__ == '__main__':
             torch.cuda.empty_cache()
     else:
         ii = 0
-        setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.test_year,
-                                                                                                    args.model_id,
-                                                                                                    args.model,
-                                                                                                    args.data,
-                                                                                                    args.features,
-                                                                                                    args.seq_len,
-                                                                                                    args.label_len,
-                                                                                                    args.pred_len,
-                                                                                                    args.d_model,
-                                                                                                    args.n_heads,
-                                                                                                    args.e_layers,
-                                                                                                    args.d_layers,
-                                                                                                    args.d_ff,
-                                                                                                    args.factor,
-                                                                                                    args.embed,
-                                                                                                    args.distil,
-                                                                                                    args.des, ii)
+        setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+            args.test_year,
+            args.fake_weight,
+            args.model_id,
+            args.model,
+            args.data,
+            args.features,
+            args.seq_len,
+            args.label_len,
+            args.pred_len,
+            args.d_model,
+            args.n_heads,
+            args.e_layers,
+            args.d_layers,
+            args.d_ff,
+            args.factor,
+            args.embed,
+            args.distil,
+            args.des, ii)
         model_setting = setting 
         model_year = args.test_year
         if args.model_year is not None:
             model_year = args.model_year
-            model_setting = '{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(args.model_year,
-                                                                                                        args.model_id,
-                                                                                                        args.model,
-                                                                                                        args.data,
-                                                                                                        args.features,
-                                                                                                        args.seq_len,
-                                                                                                        args.label_len,
-                                                                                                        args.pred_len,
-                                                                                                        args.d_model,
-                                                                                                        args.n_heads,
-                                                                                                        args.e_layers,
-                                                                                                        args.d_layers,
-                                                                                                        args.d_ff,
-                                                                                                        args.factor,
-                                                                                                        args.embed,
-                                                                                                        args.distil,
-                                                                                                        args.des, ii) 
+            model_setting = '{}_{}_{}_{}_{}_ft{}_sl{}_ll{}_pl{}_dm{}_nh{}_el{}_dl{}_df{}_fc{}_eb{}_dt{}_{}_{}'.format(
+                args.model_year,
+                args.fake_weight,
+                args.model_id,
+                args.model,
+                args.data,
+                args.features,
+                args.seq_len,
+                args.label_len,
+                args.pred_len,
+                args.d_model,
+                args.n_heads,
+                args.e_layers,
+                args.d_layers,
+                args.d_ff,
+                args.factor,
+                args.embed,
+                args.distil,
+                args.des, ii) 
         
 
         args.model_year = model_year

@@ -11,14 +11,19 @@ label_len=192
 model_name=PatchTST
 
 root_path_name=./dataset/
-data_path_name=tec.csv
+data_path_name=tec_2014.csv
 model_id_name=tec
-data_name=custom
+data_name=custom_test
 
 random_seed=2021
 
-test_year=2014
+test_year=0
+model_year=0
 
+use_fake=1
+fake_root_path=./dataset/
+fake_data_path=ddpm_fake_tail_2014.csv
+fake_weight=1.0
 
 python -u run_longExp.py \
   --random_seed $random_seed \
@@ -47,6 +52,10 @@ python -u run_longExp.py \
   --train_epochs 100\
   --patience 15\
   --test_year $test_year\
-  --run_type 0\
-  --model_year 2014\
-  --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${test_year}_${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
+  --run_type 2\
+  --model_year $model_year\
+  --use_fake $use_fake\
+  --fake_root_path $fake_root_path\
+  --fake_data_path $fake_data_path\
+  --fake_weight $fake_weight\
+  --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${test_year}_${fake_weight}_${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"
