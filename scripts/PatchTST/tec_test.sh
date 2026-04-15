@@ -23,7 +23,7 @@ model_year=0
 use_fake=1
 fake_root_path=./dataset/
 fake_data_path=ddpm_fake_tail_2014.csv
-fake_weight=1.0
+fake_weight=0.9
 
 python -u run_longExp.py \
   --random_seed $random_seed \
@@ -58,4 +58,5 @@ python -u run_longExp.py \
   --fake_root_path $fake_root_path\
   --fake_data_path $fake_data_path\
   --fake_weight $fake_weight\
+  --step1 0\
   --itr 1 --batch_size 128 --learning_rate 0.0001 2>&1 | tee "logs/LongForecasting/${test_year}_${fake_weight}_${model_name}_${model_id_name}_${seq_len}_${pred_len}.log"

@@ -100,8 +100,12 @@ if __name__ == '__main__':
     parser.add_argument('--use_fake', type=int, default=0, help='use fake data for training, 1: use, 0: not use')
     parser.add_argument('--fake_root_path', type=str, default='./data/fake/', help='root path of the fake data file')
     parser.add_argument('--fake_data_path', type=str, default='fake_data.csv', help='fake data file')
-    parser.add_argument('--fake_weight', type=float, default=0.2, help='weight of fake data in training (0-1)')
-    
+    parser.add_argument('--fake_weight', type=float, default=0, help='weight of fake data in training (0-1)')
+
+    parser.add_argument('--output_folder', type=str, default='./test_results1/', help='output folder')
+    parser.add_argument('--step1', type=int, default=0, help='which step')
+    parser.add_argument('--test_start', type=int, default=0, help='test_start')
+    parser.add_argument('--test_end', type=int, default=0, help='test_end')
     args = parser.parse_args()
     print("开始解析参数...")
 

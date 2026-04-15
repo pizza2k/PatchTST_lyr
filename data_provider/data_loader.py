@@ -193,7 +193,8 @@ class Dataset_Custom(Dataset):
     def __init__(self, root_path, fake=None, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
                  target='OT', scale=True, timeenc=0, freq='h',
-                 test_year=0, calculate_MSE=0):
+                 test_year=0, calculate_MSE=0,model_id='tec',
+                 args_test_start=0,args_test_end=0):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -206,6 +207,7 @@ class Dataset_Custom(Dataset):
             self.pred_len = size[2]
 
         self.test_year = test_year
+        self.model_id = model_id
         # init
         assert flag in ['train', 'test', 'val']
         type_map = {'train': 0, 'val': 1, 'test': 2}
@@ -246,20 +248,8 @@ class Dataset_Custom(Dataset):
         # print(cols)
 
         idx1 = idx2 = idx3 = 0
-        
-        if self.test_year == 0:
-            num_train = int(len(df_raw) * 0.7)
-            num_test = int(len(df_raw) * 0.2)
-            num_vali = len(df_raw) - num_train - num_test
-            idx1 = num_train
-            idx2 = num_train + num_vali
-            idx3 = len(df_raw)
-            print(f"   数据总长度: {len(df_raw)}")
-            print(f"   num_train: {num_train}")
-            print(f"   num_test: {num_test}")
-            print(f"   num_vali: {num_vali}")
-            
-        else:
+
+        if self.test_year != 0:
             df_raw['date'] = pd.to_datetime(df_raw['date'])
             df_raw['year'] = df_raw['date'].dt.year
             df_raw['month'] = df_raw['date'].dt.month
@@ -271,6 +261,24 @@ class Dataset_Custom(Dataset):
             # idx3 = math.ceil((test_idx[-1] - test_idx[0] + 1) / self.pred_len) *  self.pred_len + test_idx[0]
             idx3 = test_idx[-1] + 1
             idx1 = int(idx2 * 7/9)
+
+        elif args_test_start!=0 & args_test_end!=0:
+            idx3 = args_test_end + 1
+            idx2 = args_test_start
+            idx1 = int(idx2 * 7/9)
+            
+        else:
+            num_train = int(len(df_raw) * 0.7)
+            num_test = int(len(df_raw) * 0.2)
+            num_vali = len(df_raw) - num_train - num_test
+            idx1 = num_train
+            idx2 = num_train + num_vali
+            idx3 = len(df_raw)
+            print(f"   数据总长度: {len(df_raw)}")
+            print(f"   num_train: {num_train}")
+            print(f"   num_test: {num_test}")
+            print(f"   num_vali: {num_vali}")
+  
             
         border1s = [0, idx1 - self.seq_len, idx2 - self.seq_len]
         border2s = [idx1, idx2, idx3]
@@ -386,7 +394,7 @@ class Dataset_Custom(Dataset):
      
         if samples_list:
             tail_samples = pd.concat(samples_list, ignore_index=True)
-            output_path = os.path.join(folder_path, f"tail_samples_{self.test_year}.csv")
+            output_path = os.path.join(folder_path, f"tail_samples_{self.model_id}_{self.test_year}_{self.pred_len}.csv")
             tail_samples.to_csv(output_path, index=False)
             print(f"已保存 {len(item_id_array)} 个长尾样本到 {output_path}")
             return tail_samples

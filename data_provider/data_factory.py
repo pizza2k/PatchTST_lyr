@@ -46,7 +46,10 @@ def data_provider(args, flag, calculate_MSE):
         freq=freq,
         test_year=args.test_year,
         calculate_MSE=calculate_MSE,
-        fake=fake
+        fake=fake,
+        model_id=args.model_id_name,
+        args_test_start=args.test_start,
+        args_test_end=args.test_end
     )
     print(flag, len(data_set))
     data_loader = DataLoader(

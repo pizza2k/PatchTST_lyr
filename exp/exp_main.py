@@ -221,7 +221,7 @@ class Exp_Main(Exp_Basic):
         return self.model
 
     def test(self, setting, model_setting, test=0):
-        test_data, test_loader = self._get_data(flag='test', calculate_MSE=1)
+        test_data, test_loader = self._get_data(flag='test', calculate_MSE=0)
 
         print(f"1. 测试加载器信息:")
         print(f"   长度: {len(test_loader)}")
@@ -238,7 +238,7 @@ class Exp_Main(Exp_Basic):
         test_year = self.args.test_year
         model_year = self.args.model_year if test else test_year
         
-        folder_path = './test_results2/' + str(model_year) + '_' + setting + '/'
+        folder_path =  self.args.output_folder + str(model_year) + '_' + setting + '/'
         if not os.path.exists(folder_path):
             os.makedirs(folder_path)
 
@@ -315,7 +315,8 @@ class Exp_Main(Exp_Basic):
             test_params_flop((batch_x.shape[1],batch_x.shape[2]))
             exit()
 
-        # self.identify_tail_sample(all_sample_info, test_data, test_loader)
+        if self.args.step1:
+            self.identify_tail_sample(all_sample_info, test_data, test_loader)
         
         preds = np.concatenate(preds, axis=0)
         trues = np.concatenate(trues, axis=0)
@@ -337,13 +338,13 @@ class Exp_Main(Exp_Basic):
         
         if isinstance(corr, np.ndarray):
             corr = corr.mean()
-            
-        np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
-        metrics_df = pandas.DataFrame({
-            'Metric': ['MAE', 'MSE', 'RMSE', 'MAPE', 'MSPE', 'RSE', 'CORR'],
-            'Value': [mae, mse, rmse, mape, mspe, rse, corr]
-        })
-        metrics_df.to_csv(folder_path + 'metrics.csv', index=False)
+        if not self.args.step1:
+            np.save(folder_path + 'metrics.npy', np.array([mae, mse, rmse, mape, mspe,rse, corr]))
+            metrics_df = pandas.DataFrame({
+                'Metric': ['MAE', 'MSE', 'RMSE', 'MAPE', 'MSPE', 'RSE', 'CORR'],
+                'Value': [mae, mse, rmse, mape, mspe, rse, corr]
+            })
+            metrics_df.to_csv(folder_path + 'metrics.csv', index=False)
         
         np.save(folder_path + 'pred.npy', preds)
         # np.save(folder_path + 'true.npy', trues)
