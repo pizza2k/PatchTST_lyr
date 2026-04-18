@@ -106,6 +106,7 @@ if __name__ == '__main__':
     parser.add_argument('--step1', type=int, default=0, help='which step')
     parser.add_argument('--test_start', type=int, default=0, help='test_start')
     parser.add_argument('--test_end', type=int, default=0, help='test_end')
+    parser.add_argument('--model_id_name', type=str, required=True, default='tec', help='model id name')
     args = parser.parse_args()
     print("开始解析参数...")
 

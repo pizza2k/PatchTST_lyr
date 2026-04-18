@@ -10,15 +10,15 @@ label_len=192
 model_name=PatchTST
 
 root_path_name=./dataset/
-data_path_name=weather.csv
-model_id_name=weather
+data_path_name=ETTh2.csv
+model_id_name=ETTh2
 data_name=custom
 
 random_seed=2021
 
 test_year=0
-start=43911
-end=48230
+start=14592
+end=16799
 
 for pred_len in 96 192 336 720
 do
@@ -35,21 +35,20 @@ do
       --seq_len $seq_len \
       --pred_len $pred_len \
       --label_len $label_len \
-      --enc_in 21 \
+      --enc_in 7 \
       --e_layers 3 \
-      --n_heads 16 \
-      --d_model 128 \
-      --d_ff 256 \
-      --dropout 0.2\
-      --fc_dropout 0.2\
+      --n_heads 4 \
+      --d_model 16 \
+      --d_ff 128 \
+      --dropout 0.3\
+      --fc_dropout 0.3\
       --head_dropout 0\
       --patch_len 16\
       --stride 8\
       --des 'Exp' \
-      --target 'OT' \
       --train_epochs 100\
-      --patience 15\
-      --test_year 0\
+      --patience 20\
+      --test_year $test_year\
       --run_type 2\
       --model_year 0\
       --step1 1\

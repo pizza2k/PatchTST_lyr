@@ -225,6 +225,8 @@ class Dataset_Custom(Dataset):
         self.df_raw_original = None
         self.df_raw_cols = None
         self.test_start = 0
+        self.args_test_start = args_test_start
+        self.args_test_end = args_test_end
         
         self.__read_data__()
 
@@ -249,6 +251,10 @@ class Dataset_Custom(Dataset):
 
         idx1 = idx2 = idx3 = 0
 
+        print(f'test year:{self.test_year}')
+        print(f'test start:{self.args_test_start}')
+        print(f'test end:{self.args_test_end}')
+        
         if self.test_year != 0:
             df_raw['date'] = pd.to_datetime(df_raw['date'])
             df_raw['year'] = df_raw['date'].dt.year
@@ -262,9 +268,9 @@ class Dataset_Custom(Dataset):
             idx3 = test_idx[-1] + 1
             idx1 = int(idx2 * 7/9)
 
-        elif args_test_start!=0 & args_test_end!=0:
-            idx3 = args_test_end + 1
-            idx2 = args_test_start
+        elif self.args_test_start != 0 and self.args_test_end != 0:
+            idx3 = self.args_test_end + 1
+            idx2 = self.args_test_start
             idx1 = int(idx2 * 7/9)
             
         else:
