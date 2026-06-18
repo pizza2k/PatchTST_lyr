@@ -517,7 +517,8 @@ class Dataset_Pred(Dataset):
 class Dataset_Custom_Test(Dataset):
     def __init__(self, root_path, fake=None, flag='train', size=None,
                  features='S', data_path='ETTh1.csv',
-                 target='OT', scale=True, timeenc=0, freq='h', test_year=0, calculate_MSE=0):
+                 target='OT', scale=True, timeenc=0, freq='h', test_year=0, calculate_MSE=0,
+                 model_id='tec',args_test_start=0,args_test_end=0):
         # size [seq_len, label_len, pred_len]
         # info
         if size == None:
@@ -718,11 +719,13 @@ class Dataset_Custom_Test(Dataset):
     
     def __len__(self):
         original_len = len(self.data_x) - self.seq_len - self.pred_len + 1
-        
+        # print(f'original_len:{original_len}')
         if self.fake is not None and self.set_type == 0 and self.num_fake_samples > 0:
             num_fake_to_add = int(original_len * self.fake_weight)
+            # print(f'num_fake_to_add:{num_fake_to_add}')
             return original_len + num_fake_to_add
         else:
+            # print(f'no fake:{original_len}')
             return original_len
 
     def inverse_transform(self, data):
